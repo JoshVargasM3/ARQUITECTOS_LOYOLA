@@ -9,8 +9,6 @@ class FirestoreCollections {
   static const operationalCosts = 'operationalCosts';
 }
 
-enum UserRole { client, architect }
-
 enum ProjectStatus { active, onHold, finished }
 
 String projectStatusLabel(ProjectStatus status) {

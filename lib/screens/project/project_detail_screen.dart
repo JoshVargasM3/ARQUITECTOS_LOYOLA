@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../../core/app_theme.dart';
-import '../../core/constants.dart';
 import '../../models/inventory_item.dart';
 import '../../models/project.dart';
 import '../../models/video.dart';
+import '../../models/user_role.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 
