@@ -2,8 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../core/constants.dart';
 import '../models/user_profile.dart';
+import '../models/user_role.dart';
 import 'firestore_service.dart';
 
 class AuthService extends ChangeNotifier {

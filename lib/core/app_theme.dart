@@ -28,9 +28,11 @@ class LoyolaTheme {
       backgroundColor: gold,
       foregroundColor: Colors.white,
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       elevation: 4,
       shadowColor: gold.withOpacity(0.2),
     ),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/auth_service.dart';
+import '../../models/user_role.dart';
 import '../architect/architect_home_screen.dart';
 import '../client/client_home_screen.dart';
 
