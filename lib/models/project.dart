@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../core/constants.dart';
 
 class Project {
@@ -10,7 +12,12 @@ class Project {
   final double budgetTotal;
   final double budgetUsed;
   final bool isActive;
+  final String address;
+  final int estimatedDurationWeeks;
+  final DateTime? startDate;
+  final DateTime? estimatedEndDate;
   final DateTime updatedAt;
+  final DateTime? createdAt;
 
   Project({
     required this.id,
@@ -22,7 +29,12 @@ class Project {
     required this.budgetTotal,
     required this.budgetUsed,
     required this.isActive,
+    required this.address,
+    required this.estimatedDurationWeeks,
+    required this.startDate,
+    required this.estimatedEndDate,
     required this.updatedAt,
+    required this.createdAt,
   });
 
   double get budgetRemaining => budgetTotal - budgetUsed;
@@ -36,6 +48,12 @@ class Project {
       status = ProjectStatus.finished;
     }
 
+    DateTime? _toDate(dynamic value) {
+      if (value == null) return null;
+      if (value is DateTime) return value;
+      return (value as Timestamp?)?.toDate();
+    }
+
     return Project(
       id: id,
       clientId: data['clientId'] ?? '',
@@ -46,7 +64,12 @@ class Project {
       budgetTotal: (data['budgetTotal'] ?? 0).toDouble(),
       budgetUsed: (data['budgetUsed'] ?? 0).toDouble(),
       isActive: data['isActive'] ?? true,
-      updatedAt: (data['updatedAt'] as DateTime?) ?? DateTime.now(),
+      address: data['address'] ?? '',
+      estimatedDurationWeeks: (data['estimatedDurationWeeks'] ?? 0).toInt(),
+      startDate: _toDate(data['startDate']),
+      estimatedEndDate: _toDate(data['estimatedEndDate']),
+      updatedAt: _toDate(data['updatedAt']) ?? DateTime.now(),
+      createdAt: _toDate(data['createdAt']),
     );
   }
 
@@ -64,7 +87,12 @@ class Project {
       'budgetTotal': budgetTotal,
       'budgetUsed': budgetUsed,
       'isActive': isActive,
+      'address': address,
+      'estimatedDurationWeeks': estimatedDurationWeeks,
+      'startDate': startDate,
+      'estimatedEndDate': estimatedEndDate,
       'updatedAt': updatedAt,
+      'createdAt': createdAt,
     };
   }
 }

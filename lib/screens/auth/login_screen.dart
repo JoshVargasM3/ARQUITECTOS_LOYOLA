@@ -4,8 +4,9 @@ import 'package:provider/provider.dart';
 import '../../core/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_role.dart';
+import '../../widgets/animated_blocks_background.dart';
 import '../architect/architect_home_screen.dart';
-import '../client/client_home_screen.dart';
+import '../client/client_main_shell.dart';
 
 class LoginScreen extends StatefulWidget {
   static const routeName = '/login';
@@ -38,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (auth.role == UserRole.architect) {
         Navigator.pushReplacementNamed(context, ArchitectHomeScreen.routeName);
       } else {
-        Navigator.pushReplacementNamed(context, ClientHomeScreen.routeName);
+        Navigator.pushReplacementNamed(context, ClientMainShell.routeName);
       }
     } catch (e) {
       setState(() => _error = 'Error al iniciar sesión: ${e.toString()}');
@@ -50,75 +51,76 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.watch<AuthService>();
 
     return Scaffold(
-      body: Container(
-        decoration: LoyolaTheme.gradientBackground(),
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.architecture,
-                          size: 72, color: LoyolaTheme.gold),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Acceso Arquitectos Loyola',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 24),
-                      TextFormField(
-                        controller: _emailCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Correo electrónico',
-                          prefixIcon: Icon(Icons.email_outlined),
+      body: AnimatedBlocksBackground(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: SingleChildScrollView(
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.architecture,
+                            size: 72, color: LoyolaTheme.gold),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Acceso Arquitectos Loyola',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Ingresa tu correo';
-                          }
-                          if (!value.contains('@')) return 'Correo inválido';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _passwordCtrl,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Contraseña',
-                          prefixIcon: Icon(Icons.lock_outline),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Ingresa tu contraseña';
-                          }
-                          if (value.length < 6) return 'Mínimo 6 caracteres';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      if (_error != null)
-                        Text(_error!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: auth.isLoading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: LoyolaTheme.gold,
-                            foregroundColor: Colors.white,
+                        const SizedBox(height: 24),
+                        TextFormField(
+                          controller: _emailCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Correo electrónico',
+                            prefixIcon: Icon(Icons.email_outlined),
                           ),
-                          child: auth.isLoading
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text('Iniciar sesión'),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Ingresa tu correo';
+                            }
+                            if (!value.contains('@')) return 'Correo inválido';
+                            return null;
+                          },
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _passwordCtrl,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Contraseña',
+                            prefixIcon: Icon(Icons.lock_outline),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Ingresa tu contraseña';
+                            }
+                            if (value.length < 6) return 'Mínimo 6 caracteres';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        if (_error != null)
+                          Text(_error!, style: const TextStyle(color: Colors.red)),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: auth.isLoading ? null : _login,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: LoyolaTheme.gold,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: auth.isLoading
+                                ? const CircularProgressIndicator(color: Colors.white)
+                                : const Text('Iniciar sesión'),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
