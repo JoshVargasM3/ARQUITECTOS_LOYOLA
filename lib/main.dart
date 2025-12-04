@@ -7,7 +7,7 @@ import 'firebase_options.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/architect/architect_home_screen.dart';
-import 'screens/client/client_home_screen.dart';
+import 'screens/client/client_main_shell.dart';
 import 'services/auth_service.dart';
 
 Future<void> main() async {
@@ -30,7 +30,7 @@ class LoyolaApp extends StatelessWidget {
         home: const SplashScreen(),
         routes: {
           LoginScreen.routeName: (_) => const LoginScreen(),
-          ClientHomeScreen.routeName: (_) => const ClientHomeScreen(),
+          ClientMainShell.routeName: (_) => const ClientMainShell(),
           ArchitectHomeScreen.routeName: (_) => const ArchitectHomeScreen(),
         },
       ),

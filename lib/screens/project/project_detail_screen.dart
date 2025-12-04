@@ -4,9 +4,11 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../../core/app_theme.dart';
 import '../../models/inventory_item.dart';
+import '../../models/plan_document.dart';
 import '../../models/project.dart';
-import '../../models/video.dart';
+import '../../models/project_photo.dart';
 import '../../models/user_role.dart';
+import '../../models/video.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 
@@ -19,13 +21,18 @@ class ProjectDetailScreen extends StatefulWidget {
   State<ProjectDetailScreen> createState() => _ProjectDetailScreenState();
 }
 
-class _ProjectDetailScreenState extends State<ProjectDetailScreen> with SingleTickerProviderStateMixin {
+class _ProjectDetailScreenState extends State<ProjectDetailScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  double? _progressValue;
+  bool _savingProgress = false;
+  final _firestore = FirestoreService();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this, initialIndex: widget.initialTab);
+    _progressValue = widget.project.progressPercent;
+    _tabController = TabController(length: 7, vsync: this, initialIndex: widget.initialTab);
   }
 
   @override
@@ -38,70 +45,54 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> with SingleTi
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
     final isArchitect = auth.role == UserRole.architect;
-    final project = widget.project;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(project.projectName),
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabs: const [
-            Tab(text: 'Resumen'),
-            Tab(text: 'Presupuesto'),
-            Tab(text: 'Fotos'),
-            Tab(text: 'Planos'),
-            Tab(text: 'Videos'),
-            Tab(text: 'Comentarios'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildSummary(project),
-          _buildBudget(project),
-          const _PlaceholderTab(message: 'Integra Firebase Storage para fotos'),
-          const _PlaceholderTab(message: 'Integra Firebase Storage para planos'),
-          _VideosTab(projectId: project.id),
-          _CommentsTab(projectId: project.id),
-        ],
-      ),
-      drawer: Drawer(
-        child: ListView(
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: LoyolaTheme.gold),
-              child: Center(
-                child: Text('Arquitectos Loyola', style: TextStyle(color: Colors.white, fontSize: 20)),
+    return StreamBuilder<Project?>(
+      stream: _firestore.listenProject(widget.project.id),
+      initialData: widget.project,
+      builder: (context, snapshot) {
+        final project = snapshot.data ?? widget.project;
+        final progressValue = _progressValue ?? project.progressPercent;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(project.projectName),
+            bottom: TabBar(
+              controller: _tabController,
+              isScrollable: true,
+              tabs: const [
+                Tab(text: 'Resumen'),
+                Tab(text: 'Presupuesto'),
+                Tab(text: 'Inventario'),
+                Tab(text: 'Fotos'),
+                Tab(text: 'Planos'),
+                Tab(text: 'Videos'),
+                Tab(text: 'Comentarios'),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildSummary(project, isArchitect, progressValue),
+              _buildBudget(project),
+              _InventoryTab(
+                projectId: project.id,
+                isArchitect: isArchitect,
+                onSaveItem: _saveInventoryItem,
+                onDeleteItem: _deleteInventoryItem,
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.home),
-              title: const Text('Inicio'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Cerrar sesión'),
-              onTap: () async {
-                await context.read<AuthService>().signOut();
-                if (context.mounted) Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: isArchitect
-          ? FloatingActionButton(
-              onPressed: () {},
-              child: const Icon(Icons.edit),
-            )
-          : null,
+              _PhotosTab(projectId: project.id),
+              _PlansTab(projectId: project.id),
+              _VideosTab(projectId: project.id),
+              _CommentsTab(projectId: project.id),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildSummary(Project project) {
+  Widget _buildSummary(Project project, bool isArchitect, double progressValue) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -111,9 +102,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> with SingleTi
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(project.projectName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text(project.projectName,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 Text(project.description),
+                if (project.address.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(project.address, style: const TextStyle(color: Colors.black54)),
+                ],
                 const SizedBox(height: 12),
                 LinearProgressIndicator(
                   value: project.progressPercent / 100,
@@ -122,9 +118,44 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> with SingleTi
                   borderRadius: BorderRadius.circular(10),
                 ),
                 const SizedBox(height: 6),
-                Text('Avance ${project.progressPercent.toStringAsFixed(0)}% · ${projectStatusLabel(project.status)}'),
-                const SizedBox(height: 12),
-                Text('Última actualización: ${project.updatedAt.toLocal()}'),
+                Text('Avance ${project.progressPercent.toStringAsFixed(0)}%'),
+                if (isArchitect) ...[
+                  const SizedBox(height: 16),
+                  const Text('Editar avance',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Slider(
+                    value: progressValue.clamp(0, 100).toDouble(),
+                    min: 0,
+                    max: 100,
+                    divisions: 100,
+                    label: '${progressValue.toStringAsFixed(0)}%',
+                    onChanged: (value) => setState(() => _progressValue = value),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _savingProgress
+                          ? null
+                          : () async {
+                              setState(() => _savingProgress = true);
+                              await _firestore.updateProjectProgress(
+                                projectId: project.id,
+                                progressPercent: _progressValue ?? project.progressPercent,
+                              );
+                              if (mounted) {
+                                setState(() => _savingProgress = false);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Avance actualizado')),
+                                );
+                              }
+                            },
+                      icon: const Icon(Icons.save),
+                      label: _savingProgress
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text('Guardar cambios'),
+                    ),
+                  )
+                ],
               ],
             ),
           ),
@@ -136,7 +167,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> with SingleTi
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Inventario (resumen)', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Inventario (resumen)',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 _InventoryPreview(projectId: project.id),
               ],
@@ -168,6 +200,308 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> with SingleTi
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _saveInventoryItem(InventoryItem item, {bool isEditing = false}) async {
+    if (isEditing) {
+      await _firestore.updateInventoryItem(projectId: widget.project.id, item: item);
+    } else {
+      await _firestore.addInventoryItem(projectId: widget.project.id, item: item);
+    }
+  }
+
+  Future<void> _deleteInventoryItem(String itemId) async {
+    await _firestore.deleteInventoryItem(projectId: widget.project.id, itemId: itemId);
+  }
+}
+
+class _InventoryTab extends StatelessWidget {
+  final String projectId;
+  final bool isArchitect;
+  final Future<void> Function(InventoryItem item, {bool isEditing}) onSaveItem;
+  final Future<void> Function(String itemId) onDeleteItem;
+  const _InventoryTab({
+    required this.projectId,
+    required this.isArchitect,
+    required this.onSaveItem,
+    required this.onDeleteItem,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<InventoryItem>>(
+      stream: FirestoreService().listenInventory(projectId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final items = snapshot.data!;
+        final total = items.fold<double>(0, (sum, item) => sum + item.totalCost);
+        return Column(
+          children: [
+            Expanded(
+              child: items.isEmpty
+                  ? const Center(child: Text('No hay materiales registrados'))
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: items.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == items.length) {
+                          return Card(
+                            child: ListTile(
+                              title: const Text('Total inventario',
+                                  style: TextStyle(fontWeight: FontWeight.bold)),
+                              trailing: Text('MXN ${total.toStringAsFixed(2)}'),
+                            ),
+                          );
+                        }
+                        final item = items[index];
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          child: ListTile(
+                            title: Text(item.name),
+                            subtitle: Text(
+                                '${item.category} · ${item.quantity} ${item.unit} · MXN ${item.unitCost.toStringAsFixed(2)}'),
+                            trailing: Text('MXN ${item.totalCost.toStringAsFixed(2)}'),
+                            onTap: isArchitect
+                                ? () => _openInventoryForm(context, item: item)
+                                : null,
+                            onLongPress:
+                                isArchitect ? () => _confirmDelete(context, item.id) : null,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            if (isArchitect)
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openInventoryForm(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: LoyolaTheme.gold,
+                        foregroundColor: Colors.white,
+                      ),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Agregar material'),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, String id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar material'),
+        content: const Text('¿Deseas eliminar este material?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Eliminar')),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await onDeleteItem(id);
+    }
+  }
+
+  Future<void> _openInventoryForm(BuildContext context, {InventoryItem? item}) async {
+    final nameCtrl = TextEditingController(text: item?.name ?? '');
+    final categoryCtrl = TextEditingController(text: item?.category ?? '');
+    final quantityCtrl = TextEditingController(text: (item?.quantity ?? 0).toString());
+    final unitCtrl = TextEditingController(text: item?.unit ?? '');
+    final unitCostCtrl = TextEditingController(text: (item?.unitCost ?? 0).toString());
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            left: 16,
+            right: 16,
+            top: 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(item == null ? 'Agregar material' : 'Editar material',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+              ),
+              TextField(
+                controller: categoryCtrl,
+                decoration: const InputDecoration(labelText: 'Categoría'),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: quantityCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Cantidad'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: unitCtrl,
+                      decoration: const InputDecoration(labelText: 'Unidad'),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: unitCostCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Costo unitario'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final newItem = InventoryItem(
+                      id: item?.id ?? '',
+                      name: nameCtrl.text.trim(),
+                      category: categoryCtrl.text.trim(),
+                      unit: unitCtrl.text.trim(),
+                      quantity: double.tryParse(quantityCtrl.text) ?? 0,
+                      unitCost: double.tryParse(unitCostCtrl.text) ?? 0,
+                      totalCost: 0,
+                      updatedAt: DateTime.now(),
+                    );
+                    await onSaveItem(newItem, isEditing: item != null);
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: LoyolaTheme.gold,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Guardar'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PhotosTab extends StatelessWidget {
+  final String projectId;
+  const _PhotosTab({required this.projectId});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<ProjectPhoto>>(
+      stream: FirestoreService().listenPhotos(projectId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final photos = snapshot.data!;
+        if (photos.isEmpty) {
+          return const Center(child: Text('No hay fotos registradas'));
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: photos.length,
+          itemBuilder: (context, index) {
+            final photo = photos[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (photo.imageUrl.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      child: Image.network(photo.imageUrl, fit: BoxFit.cover),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(photo.title,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        const SizedBox(height: 4),
+                        Text(photo.section, style: const TextStyle(color: Colors.black54)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _PlansTab extends StatelessWidget {
+  final String projectId;
+  const _PlansTab({required this.projectId});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<PlanDocument>>(
+      stream: FirestoreService().listenPlans(projectId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final plans = snapshot.data!;
+        if (plans.isEmpty) {
+          return const Center(child: Text('No hay planos cargados'));
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: plans.length,
+          itemBuilder: (context, index) {
+            final plan = plans[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: ListTile(
+                leading: plan.fileUrl.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(plan.fileUrl, width: 60, height: 60, fit: BoxFit.cover),
+                      )
+                    : const Icon(Icons.description_outlined),
+                title: Text(plan.name),
+                subtitle: Text('${plan.section}\n${plan.description}'),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -297,7 +631,8 @@ class _VideosTab extends StatelessWidget {
           itemCount: videos.length,
           itemBuilder: (context, index) {
             final video = videos[index];
-            final controller = YoutubePlayerController.fromVideoId(videoId: YoutubePlayerController.convertUrlToId(video.youtubeUrl) ?? '');
+            final controller = YoutubePlayerController.fromVideoId(
+                videoId: YoutubePlayerController.convertUrlToId(video.youtubeUrl) ?? '');
             return Card(
               margin: const EdgeInsets.all(12),
               child: Column(
@@ -349,29 +684,14 @@ class _InventoryPreview extends StatelessWidget {
                 (item) => ListTile(
                   dense: true,
                   title: Text(item.name),
-                  subtitle: Text('${item.quantity} ${item.unit} · MXN ${item.unitCost.toStringAsFixed(2)}'),
+                  subtitle:
+                      Text('${item.quantity} ${item.unit} · MXN ${item.unitCost.toStringAsFixed(2)}'),
                   trailing: Text('MXN ${item.totalCost.toStringAsFixed(2)}'),
                 ),
               )
               .toList(),
         );
       },
-    );
-  }
-}
-
-class _PlaceholderTab extends StatelessWidget {
-  final String message;
-  const _PlaceholderTab({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: const TextStyle(color: Colors.black54),
-      ),
     );
   }
 }

@@ -5,7 +5,7 @@ import '../../core/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_role.dart';
 import '../architect/architect_home_screen.dart';
-import '../client/client_home_screen.dart';
+import '../client/client_main_shell.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -47,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (auth.role == UserRole.architect) {
       Navigator.pushReplacementNamed(context, ArchitectHomeScreen.routeName);
     } else {
-      Navigator.pushReplacementNamed(context, ClientHomeScreen.routeName);
+      Navigator.pushReplacementNamed(context, ClientMainShell.routeName);
     }
   }
 
